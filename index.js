@@ -52,7 +52,7 @@ NETWORKS.forEach(function(n) {
 
 var genreCache = {};
 TV_GENRES.forEach(function(g) {
-  genreCache[g.id] = { series: [], lastFetch: 0, building: false };
+  genreCache['g'+g.id] = { series: [], lastFetch: 0, building: false };
 });
 
 var specialCache = {
@@ -166,7 +166,7 @@ async function buildNetworkCache(network) {
 }
 
 async function buildGenreCache(genre) {
-  var c = genreCache[genre.id];
+  var c = genreCache['g'+genre.id];
   if (c.building || Date.now() - c.lastFetch < CACHE_TTL) return;
   c.building = true;
   console.log('[zanr ' + genre.name + '] Budovanie cache...');
@@ -176,7 +176,7 @@ async function buildGenreCache(genre) {
       + '&language=cs-CZ&include_adult=false&sort_by=popularity.desc&vote_count.gte=20';
     var results = await fetchPages(url, 10);
     var series = dedup(results);
-    genreCache[genre.id] = { series: series, lastFetch: Date.now(), building: false };
+    genreCache['g'+genre.id] = { series: series, lastFetch: Date.now(), building: false };
     console.log('[zanr ' + genre.name + '] ' + series.length + ' serialov');
   } catch(e) {
     c.building = false;
@@ -207,7 +207,7 @@ async function ensureNetworkCache(network) {
 }
 
 async function ensureGenreCache(genre) {
-  var c = genreCache[genre.id];
+  var c = genreCache['g'+genre.id];
   if (c.series.length > 0 && Date.now() - c.lastFetch < CACHE_TTL) return;
   var key = 'g' + genre.id;
   if (!buildPromises[key]) buildPromises[key] = buildGenreCache(genre).finally(function() { delete buildPromises[key]; });
@@ -270,7 +270,7 @@ app.get('/catalog/series/:id/:extra?.json', async function(req, res) {
       }
       if (!genre) return res.json({ metas: [] });
       await ensureGenreCache(genre);
-      var gs = genreCache[genreId].series.map(toItem);
+      var gs = genreCache['g'+genreId].series.map(toItem);
       return res.json({ metas: gs.slice(extra.skip, extra.skip + 20) });
     }
 
@@ -300,7 +300,7 @@ app.get('/', function(req, res) {
     return n.emoji + ' ' + n.name + ': ' + c.series.length + ' serialov (' + age + ')';
   }).join('\n');
   var gRows = TV_GENRES.map(function(g) {
-    var c = genreCache[g.id];
+    var c = genreCache['g'+g.id];
     var age = c.lastFetch ? Math.round((Date.now() - c.lastFetch) / 60000) + ' min' : 'nahrava sa';
     return '🎭 ' + g.name + ': ' + c.series.length + ' serialov (' + age + ')';
   }).join('\n');
@@ -309,18 +309,25 @@ app.get('/', function(req, res) {
 
 app.listen(PORT, function() {
   console.log('Server TV Siete na porte ' + PORT);
+
   (async function() {
+    var tUrl  = 'https://api.themoviedb.org/3/trending/tv/week?api_key=' + TMDB_KEY + '&language=cs-CZ';
+    var trUrl = 'https://api.themoviedb.org/3/discover/tv?api_key=' + TMDB_KEY + '&sort_by=vote_average.desc&vote_count.gte=500&language=cs-CZ&include_adult=false';
+    var nUrl  = 'https://api.themoviedb.org/3/discover/tv?api_key=' + TMDB_KEY + '&sort_by=first_air_date.desc&vote_count.gte=10&language=cs-CZ&include_adult=false';
+
+    await Promise.all(
+      TV_GENRES.map(function(g) { return buildGenreCache(g); }).concat([
+        buildSpecialCache('trending', tUrl, 5),
+        buildSpecialCache('toprated', trUrl, 10),
+        buildSpecialCache('newest', nUrl, 10),
+      ])
+    );
+    console.log('Zanre a specialne katalogy hotove');
+
     for (var i = 0; i < NETWORKS.length; i++) {
       await buildNetworkCache(NETWORKS[i]);
     }
-    for (var j = 0; j < TV_GENRES.length; j++) {
-      await buildGenreCache(TV_GENRES[j]);
-    }
-    var tUrl = 'https://api.themoviedb.org/3/trending/tv/week?api_key=' + TMDB_KEY + '&language=cs-CZ';
-    await buildSpecialCache('trending', tUrl, 5);
-    var trUrl = 'https://api.themoviedb.org/3/discover/tv?api_key=' + TMDB_KEY + '&sort_by=vote_average.desc&vote_count.gte=500&language=cs-CZ&include_adult=false';
-    await buildSpecialCache('toprated', trUrl, 10);
-    var nUrl = 'https://api.themoviedb.org/3/discover/tv?api_key=' + TMDB_KEY + '&sort_by=first_air_date.desc&vote_count.gte=10&language=cs-CZ&include_adult=false';
-    await buildSpecialCache('newest', nUrl, 10);
+    console.log('Vsetky siete hotove');
   })();
 });
+
