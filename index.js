@@ -269,18 +269,18 @@ app.get('/catalog/series/:id/:extra?.json', async function(req, res) {
 
     // Top rated
     if (id === 'net-top-rated') {
-      return res.json({ metas: await fetchTopRated(extra.skip) });
+      return res.json({ metas: await fetchTopRated(extra.skip || 0) });
     }
 
     // Najnovšie
     if (id === 'net-new') {
-      return res.json({ metas: await fetchNew(extra.skip) });
+      return res.json({ metas: await fetchNew(extra.skip || 0) });
     }
 
     // Žáner
     if (id.startsWith('netgenre-')) {
       var genreId = id.replace('netgenre-', '');
-      return res.json({ metas: await fetchGenre(genreId, extra.skip) });
+      return res.json({ metas: await fetchGenre(genreId, extra.skip || 0) });
     }
 
     // Sieť
@@ -300,8 +300,8 @@ app.get('/catalog/series/:id/:extra?.json', async function(req, res) {
 
     res.json({ metas: [] });
   } catch(e) {
-    console.error(e);
-    res.status(500).json({ metas: [] });
+    console.error('[catalog error] id=' + req.params.id + ' err=' + e.message);
+    res.status(500).json({ metas: [], error: e.message });
   }
 });
 
