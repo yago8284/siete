@@ -40,9 +40,7 @@ const TV_GENRES = [
   { id: 18,    name: 'Drama'           },
   { id: 10751, name: 'Rodinny'         },
   { id: 9648,  name: 'Mysteriozny'     },
-  { id: 878,   name: 'Sci-Fi'          },
   { id: 10765, name: 'Sci-Fi/Fantasy'  },
-  { id: 53,    name: 'Thriller'        },
 ];
 
 var networkCache = {};
